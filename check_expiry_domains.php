@@ -49,6 +49,7 @@ function exe_check_expiry_domains() {
 				,'password' => getenv('VALUE_DOMAIN_PASS')
 				,'action'   => 'login2'
 			]
+			,'type'      => 'dom'
 		];
 	}
 
@@ -62,6 +63,7 @@ function exe_check_expiry_domains() {
 				,'TEMPLATE' => ''
 				,'login'    => ''
 			]
+			,'type'      => 'dom'
 		];
 	}
 
@@ -73,6 +75,7 @@ function exe_check_expiry_domains() {
 				'username'   => getenv('ONAMAE_USER')
 				,'password'  => getenv('ONAMAE_PASS')
 			]
+			,'type'      => 'dom'
 		];
 	}
 
@@ -84,6 +87,7 @@ function exe_check_expiry_domains() {
 				'memberLogin[membercd]'  => getenv('SAKURA_USER')
 				,'memberLogin[password]' => getenv('SAKURA_PASS')
 			]
+			,'type'      => 'dom'
 		];
 	}
 
@@ -151,79 +155,66 @@ function exe_check_expiry_domains() {
 		} else {
 			$httpcode = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
 			if ( $response ) {
-				switch ( $service ) {
-					case 'value-domain':
-						$doc = new DOMDocument();
-						libxml_use_internal_errors( true );
-						$doc->loadHTML( $response );
-						libxml_clear_errors();
-						$xpath = new DOMXPath($doc);
-						$nodes = $xpath->query('//table/tr[position()>1]');
-						foreach ( $nodes as $node  ) {
-							$node_value  = preg_replace( '#[ \t\r\n]+#', ' ', $node->nodeValue );
-							$arr         = explode(' ', $node_value );
-							$arr         = array_values(array_filter($arr));
-							$domain      = $arr[0];
-							$expire_date = $arr[1];
-							$expires[]   = [$domain, $expire_date];
-						}
-						break;
-					case 'gonbei':
-						$doc = new DOMDocument();
-						libxml_use_internal_errors( true );
-						$doc->loadHTML( $response );
-						libxml_clear_errors();
-						$xpath = new DOMXPath($doc);
-						$nodes = $xpath->query('//table/tr/td/table/tr/td/table/tr/td/table/tr/td/table/tr/td/table/tr');
-						foreach ( $nodes as $node ) {
-							$node_value = preg_replace( '#[ \t\r\n]+#', ' ', $node->nodeValue );
-							$node_value = trim($node_value);
-							if ( preg_match('#ドメイン取得サービス.*契約中.*#', $node_value, $m )) {
-								$arr = explode(' ', $m[0] );
-								$arr = array_values(array_filter($arr));
-								if ( count($arr) <= 5 ) {
-									array_splice( $arr, 0, -3 );
-									$domain = $arr[0];
-									$expire_date = str_replace( ['迄', '/'], ['', '-'], $arr[2] );
-									$expires[] = [$domain, $expire_date];
+				if ( $urls['type'] === 'dom' ) {
+					$doc = new DOMDocument();
+					libxml_use_internal_errors( true );
+					$doc->loadHTML( $response );
+					libxml_clear_errors();
+					$xpath = new DOMXPath($doc);
+					switch ( $service ) {
+						case 'value-domain':
+							$nodes = $xpath->query('//table/tr[position()>1]');
+							foreach ( $nodes as $node  ) {
+								$node_value  = preg_replace( '#[ \t\r\n]+#', ' ', $node->nodeValue );
+								$arr         = explode(' ', $node_value );
+								$arr         = array_values(array_filter($arr));
+								$domain      = $arr[0];
+								$expire_date = $arr[1];
+								$expires[]   = [$domain, $expire_date];
+							}
+							break;
+						case 'gonbei':
+							$nodes = $xpath->query('//table/tr/td/table/tr/td/table/tr/td/table/tr/td/table/tr/td/table/tr');
+							foreach ( $nodes as $node ) {
+								$node_value = preg_replace( '#[ \t\r\n]+#', ' ', $node->nodeValue );
+								$node_value = trim($node_value);
+								if ( preg_match('#ドメイン取得サービス.*契約中.*#', $node_value, $m )) {
+									$arr = explode(' ', $m[0] );
+									$arr = array_values(array_filter($arr));
+									if ( count($arr) <= 5 ) {
+										array_splice( $arr, 0, -3 );
+										$domain = $arr[0];
+										$expire_date = str_replace( ['迄', '/'], ['', '-'], $arr[2] );
+										$expires[] = [$domain, $expire_date];
+									}
 								}
 							}
-						}
-						break;
-					case 'onamae.com':
-						$doc = new DOMDocument();
-						libxml_use_internal_errors( true );
-						$doc->loadHTML( $response );
-						libxml_clear_errors();
-						$xpath = new DOMXPath($doc);
-						$nodes = $xpath->query('//table/tr[position()>1]');
-						foreach ( $nodes as $node ) {
-							$node_value = preg_replace( '#[ \t\r\n]+#', ' ', $node->nodeValue );
-							$node_value = trim($node_value);
-							$arr = explode(' ', $node_value );
-							$arr = array_values(array_filter($arr));
-							$domain      = $arr[0];
-							$expire_date = str_replace( ['/'], ['-'], $arr[1] );
-							$expires[]   = [$domain, $expire_date];
-						}
-						break;
-					case 'sakura-internet':
-						$doc = new DOMDocument();
-						libxml_use_internal_errors( true );
-						$doc->loadHTML( $response );
-						libxml_clear_errors();
-						$xpath = new DOMXPath($doc);
-						$nodes = $xpath->query('//table[@class="frame"]/tr[position()>1]');
-						foreach ( $nodes as $node ) {
-							$node_value = preg_replace( '#[ \t\r\n]+#', ' ', $node->nodeValue );
-							$node_value = trim($node_value);
-							$arr = explode(' ', $node_value );
-							$arr = array_values(array_filter($arr));
-							$domain = preg_replace( '#[0-9]+\z#', '', $arr[0] );
-							$expire_date = str_replace( ['年', '月', '日'], ['-', '-', ''], $arr[1] );
-							$expires[]   = [$domain, $expire_date];
-						}
-						break;
+							break;
+						case 'onamae.com':
+							$nodes = $xpath->query('//table/tr[position()>1]');
+							foreach ( $nodes as $node ) {
+								$node_value = preg_replace( '#[ \t\r\n]+#', ' ', $node->nodeValue );
+								$node_value = trim($node_value);
+								$arr = explode(' ', $node_value );
+								$arr = array_values(array_filter($arr));
+								$domain      = $arr[0];
+								$expire_date = str_replace( ['/'], ['-'], $arr[1] );
+								$expires[]   = [$domain, $expire_date];
+							}
+							break;
+						case 'sakura-internet':
+							$nodes = $xpath->query('//table[@class="frame"]/tr[position()>1]');
+							foreach ( $nodes as $node ) {
+								$node_value = preg_replace( '#[ \t\r\n]+#', ' ', $node->nodeValue );
+								$node_value = trim($node_value);
+								$arr = explode(' ', $node_value );
+								$arr = array_values(array_filter($arr));
+								$domain = preg_replace( '#[0-9]+\z#', '', $arr[0] );
+								$expire_date = str_replace( ['年', '月', '日'], ['-', '-', ''], $arr[1] );
+								$expires[]   = [$domain, $expire_date];
+							}
+							break;
+					}
 				}
 
 				foreach ( $expires as $e ) {
